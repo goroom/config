@@ -5,6 +5,7 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"reflect"
 	//	"fmt"
 	"io"
 	"os"
@@ -13,27 +14,22 @@ import (
 )
 
 type Config struct {
-	config_file_path string
-	data             map[string](string)
+	data map[string](string)
 }
 
-func NewConfig(config_file_path string) (*Config, error) {
+func NewConfig() *Config {
 	var config Config
-	config.config_file_path = config_file_path
 	config.data = make(map[string](string))
 
-	err := config.Load()
-	if err != nil {
-		return nil, err
-	}
-	return &config, nil
+	return &config
 }
 
-func (this *Config) Load() error {
-	f, err := os.Open(this.config_file_path)
+func (this *Config) LoadFile(file_path string) error {
+	f, err := os.Open(file_path)
 	if err != nil {
 		return err
 	}
+
 	defer f.Close()
 
 	buff := bufio.NewReader(f)
@@ -42,7 +38,6 @@ func (this *Config) Load() error {
 	for {
 		b, _, err := buff.ReadLine()
 		if err != nil || io.EOF == err {
-			//			fmt.Println(err)
 			break
 		}
 		line := string(b)
@@ -70,8 +65,6 @@ func (this *Config) Load() error {
 			return errors.New("Line " + strconv.Itoa(line_number) + " error, [" + line + "]")
 		}
 
-		//		fmt.Println("[" + key + "][" + value + "]")
-
 		this.data[key] = value
 		line_number++
 	}
@@ -88,15 +81,7 @@ func (this *Config) GetString(key string) string {
 }
 
 func (this *Config) GetInt16(key string) int16 {
-	value, ok := this.data[key]
-	if ok {
-		i, err := strconv.Atoi(value)
-		if err != nil {
-			return 0
-		}
-		return int16(i)
-	}
-	return 0
+	return int16(this.GetInt(key))
 }
 
 func (this *Config) GetInt(key string) int {
@@ -107,6 +92,35 @@ func (this *Config) GetInt(key string) int {
 			return 0
 		}
 		return i
+	}
+	return 0
+}
+
+func (this *Config) GetInt32(key string) int32 {
+	return int32(this.GetInt(key))
+}
+
+func (this *Config) GetInt64(key string) int64 {
+	value, ok := this.data[key]
+	if ok {
+		i, err := strconv.ParseInt(value, 10, 64)
+		if err != nil {
+			return 0
+		}
+		return i
+	}
+	return 0
+}
+
+func (this *Config) GetFloat32(key string) float32 {
+	value, ok := this.data[key]
+	if ok {
+		i, err := strconv.ParseFloat(value, 32)
+		if err != nil {
+			fmt.Println(err)
+			return 0
+		}
+		return float32(i)
 	}
 	return 0
 }
@@ -127,7 +141,47 @@ func (this *Config) GetFloat64(key string) float64 {
 func (this *Config) String() string {
 	b, err := json.Marshal(this.data)
 	if err != nil {
-		return err.Error()
+		fmt.Println(err)
+		return ""
 	}
 	return string(b)
+}
+
+func (this *Config) GetBool(key string) bool {
+	value, ok := this.data[key]
+	if ok && strings.ToLower(value) == "true" {
+		return true
+	}
+	return false
+}
+
+func (this *Config) Unmarshal(object interface{}) error {
+	myref := reflect.ValueOf(object).Elem()
+	typeOfType := myref.Type()
+	for i := 0; i < myref.NumField(); i++ {
+		field := myref.Field(i)
+		value := this.GetString(typeOfType.Field(i).Name)
+		if value == "" {
+			return errors.New("Can not find config " + typeOfType.Field(i).Name)
+		}
+		switch field.Type().Kind() {
+		case reflect.Int16, reflect.Int, reflect.Int32, reflect.Int64:
+			field.SetInt(this.GetInt64(typeOfType.Field(i).Name))
+		case reflect.Float32, reflect.Float64:
+			if field.CanSet() {
+				field.SetFloat(this.GetFloat64(typeOfType.Field(i).Name))
+			}
+		case reflect.Bool:
+			if field.CanSet() {
+				field.SetBool(this.GetBool(typeOfType.Field(i).Name))
+			}
+		case reflect.String:
+			if field.CanSet() {
+				field.SetString(value)
+			}
+		default:
+			return errors.New("Unknow type " + field.Type().String() + " for " + typeOfType.Field(i).Name)
+		}
+	}
+	return nil
 }
