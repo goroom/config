@@ -167,18 +167,23 @@ func (this *Config) Unmarshal(object interface{}) error {
 		switch field.Type().Kind() {
 		case reflect.Int16, reflect.Int, reflect.Int32, reflect.Int64:
 			field.SetInt(this.GetInt64(typeOfType.Field(i).Name))
+		case reflect.Uint16:
+			field.SetUint(uint64(this.GetInt64(typeOfType.Field(i).Name)))
 		case reflect.Float32, reflect.Float64:
 			if field.CanSet() {
 				field.SetFloat(this.GetFloat64(typeOfType.Field(i).Name))
 			}
+
 		case reflect.Bool:
 			if field.CanSet() {
 				field.SetBool(this.GetBool(typeOfType.Field(i).Name))
 			}
+
 		case reflect.String:
 			if field.CanSet() {
 				field.SetString(value)
 			}
+
 		default:
 			return errors.New("Unknow type " + field.Type().String() + " for " + typeOfType.Field(i).Name)
 		}
