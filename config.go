@@ -162,7 +162,8 @@ func (this *Config) Unmarshal(object interface{}) error {
 		field := myref.Field(i)
 		value := this.GetString(typeOfType.Field(i).Name)
 		if value == "" {
-			return errors.New("Can not find config " + typeOfType.Field(i).Name)
+			continue
+			//return errors.New("Can not find config " + typeOfType.Field(i).Name)
 		}
 		switch field.Type().Kind() {
 		case reflect.Int16, reflect.Int, reflect.Int32, reflect.Int64:
